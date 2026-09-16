@@ -1,3 +1,21 @@
+// Openshell:
+
+I’ve reviewed the uploaded OpenShell transcript. 
+
+The core material covers:
+
+* **OpenShell as a containment runtime** for autonomous AI agents.
+* Four architectural components: **Gateway, Sandbox, Policy Engine, and Privacy Router**. 
+* **K3s inside a Docker container** to provide the isolated runtime. 
+* Declarative **YAML policies** covering filesystem, process, network, and inference controls. 
+* Separation of the **control plane from the agent's data plane**, preventing the agent from modifying its own policies. 
+* **Ephemeral credential injection** rather than exposing API keys in the sandbox filesystem. 
+* Optional **host GPU access** for local/private AI workloads. 
+* An **agent-first development model**, where agents investigate, prototype, implement, and review security issues, while humans remain the approval gate. 
+* The transcript ends with the important governance question: **“who guards the guards?”**—what happens when humans can no longer fully understand or audit increasingly complex agent-generated systems. 
+
+This gives you a strong foundation for connecting **OpenShell containment** with your broader **agent identity/governance** discussion: OpenShell primarily answers *“What can the agent access and execute?”*, while an identity-governance layer can address *“Who is this agent, on whose authority is it acting, what delegation chain produced that authority, and should this particular action be authorized?”*
+
 
 Yes. Based on the OpenShell architecture and the identity-governance direction you've been developing for **EdgeMind**, I would frame the demo as a progression:
 
