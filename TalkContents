@@ -1,0 +1,25 @@
+**Research/Project Hypothesis: Identity Governance + NVIDIA OpenShell**
+
+**Primary hypothesis**
+
+Sandboxing and identity governance are structurally independent controls — enforcing one does not guarantee the other — and a multi-agent system that implements both will correctly reject unauthorized actions in cases where either control alone would fail to catch them.
+
+**Sub-hypotheses (what the three demo scenarios each test)**
+
+1. **H1 — Sandbox necessity**: A correctly-authenticated, correctly-authorized agent (valid identity credential) can still attempt an out-of-scope action that only an OS-level sandbox boundary will catch. *(Tests: identity-alone is insufficient.)*
+2. **H2 — Identity necessity**: An agent operating fully within its sandbox's technical permissions can still act outside its authorized intent/scope, and only an independent identity/credential check will catch it. *(Tests: sandboxing-alone is insufficient — this is the load-bearing hypothesis of the whole talk.)*
+3. **H3 — Revocability independent of code**: Authority granted to an agent can be revoked at runtime without any change to that agent's code or sandbox configuration, and the revocation takes effect on the agent's very next action. *(Tests: governance is a live, ongoing property — not a deploy-time artifact.)*
+
+**Null hypothesis (what would disprove this)**
+
+If a single unified check (either sandbox-only or identity-only) can be shown to catch every case the other layer catches, the two-layer architecture adds complexity without added guarantees — i.e., the layers aren't actually independent, and identity governance would be redundant with sufficiently strict sandboxing (or vice versa).
+
+**Success criteria / what "proving it" looks like**
+
+- Each scenario (H1, H2, H3) produces a denial or revocation event that the *other* layer alone would not have produced.
+- The resulting audit log shows both layers' decisions recorded independently at every hop — evidence that they were actually evaluated separately, not collapsed into one gate.
+- The delegation chain (User → Triage → Specialist) remains traceable end-to-end even in denial cases, supporting the accountability claim for ISO 42001 / regulatory framing.
+
+**Why this framing matters for the talk**
+
+Most "agent security" demos implicitly assume sandboxing subsumes governance. Naming H2 explicitly as the hypothesis under test — and then live-demoing a case that falsifies the null — is what turns this from a product demo into an argument, which is a stronger hook for an audience than a feature walkthrough.
