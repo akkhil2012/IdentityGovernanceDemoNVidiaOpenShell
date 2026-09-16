@@ -1,0 +1,28 @@
+{
+  "agents": [
+    {
+      "id": "fraud_agent",
+      "policy": {
+        "files": ["data/fraud_data.txt"],
+        "network": [],
+        "spawn": []
+      }
+    },
+    {
+      "id": "offers_agent",
+      "policy": {
+        "files": ["data/offers_data.txt", "data/shared.txt"],
+        "network": ["api.offers.local", "api.payments.local"],
+        "spawn": []
+      }
+    },
+    {
+      "id": "servicing_agent",
+      "policy": {
+        "files": ["data/servicing_data.txt"],
+        "network": ["api.servicing.local"],
+        "spawn": []
+      }
+    }
+  ]
+}
