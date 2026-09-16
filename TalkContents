@@ -1,3 +1,1233 @@
+
+Yes. Based on the OpenShell architecture and the identity-governance direction you've been developing for **EdgeMind**, I would frame the demo as a progression:
+
+> **Identity → Identity Resolution → Delegation → Agent Identity → Runtime Governance → Sandboxed Execution**
+
+The important distinction is that **OpenShell is not itself an identity-resolution or agent-governance solution**. It provides a strong **runtime enforcement boundary**. Your proposed identity-governance layer can sit above/alongside it and answer the question: **“Who is this agent acting for, why is it acting, what authority was delegated to it, and is this action appropriate at this point in the chain?”**
+
+---
+
+# 1. What is defined as "Identity" in this ecosystem?
+
+For your demo, I would define identity as:
+
+> **Identity is the cryptographically verifiable representation of an entity, workload, agent, or delegation context that allows a system to determine who or what is making a request, on whose behalf, and with what authority.**
+
+In an AI-agent ecosystem, there are actually several identities:
+
+```text
+Human Identity
+      │
+      ▼
+Application / Session Identity
+      │
+      ▼
+Parent Agent Identity
+      │
+      ▼
+Child Agent Identity
+      │
+      ▼
+Tool / MCP Identity
+      │
+      ▼
+Workload / Sandbox Identity
+```
+
+And these should not be collapsed into one `user_id`.
+
+For example:
+
+```text
+Akhil
+  │
+  │ authorized
+  ▼
+Marketing Agent
+  │
+  │ delegates
+  ▼
+Identity Resolution Agent
+  │
+  │ calls
+  ▼
+Customer Data MCP
+  │
+  │ accesses
+  ▼
+CDP Identity Graph
+```
+
+The system needs to preserve the entire relationship.
+
+A useful identity object therefore becomes:
+
+```text
+WHO
+ └── agent-123
+
+ON_BEHALF_OF
+ └── marketing-user-456
+
+PARENT
+ └── campaign-agent-001
+
+PURPOSE
+ └── credit-card-customer-acquisition
+
+CAPABILITY
+ └── identity.resolve
+
+RESOURCE
+ └── CDP.identity.graph
+
+CONSTRAINT
+ └── campaign_id = 789
+
+EXPIRY
+ └── 5 minutes
+
+PROVENANCE
+ └── signed delegation chain
+```
+
+That is much richer than traditional:
+
+```text
+Authorization: Bearer <token>
+```
+
+---
+
+# 2. How are identities resolved today?
+
+Today, identity resolution generally happens across **several different layers**, rather than through one universal identity mechanism.
+
+For a conventional enterprise application:
+
+```text
+User
+ │
+ ▼
+IdP
+ │
+ ├── Authentication
+ │
+ ▼
+Access Token
+ │
+ ▼
+Application
+ │
+ ▼
+Service Account / Workload Identity
+ │
+ ▼
+Database/API
+```
+
+Examples include:
+
+* OAuth/OIDC identity
+* enterprise directories
+* IAM roles
+* service accounts
+* workload identities
+* API credentials
+* device identities
+* customer identity graphs
+* CDP identity resolution
+
+For **AdTech/CDP**, identity resolution has another meaning:
+
+```text
+Browser cookie
+Mobile device
+Email
+Phone
+CRM ID
+Loyalty ID
+Transaction ID
+Device ID
+Advertising ID
+      │
+      ▼
+Identity Resolution
+      │
+      ▼
+Canonical Customer / Household
+```
+
+The system attempts to determine:
+
+> "Do these apparently different records represent the same person, household, or entity?"
+
+That is **data identity resolution**.
+
+Your agent-governance problem is different:
+
+> "Which agent is making this decision, who authorized it, what evidence did it use, and what authority does it currently possess?"
+
+That is **execution identity resolution**.
+
+Your opportunity is to connect the two.
+
+---
+
+# 3. Why doesn't OBO — On-Behalf-Of — suffice?
+
+OBO is useful.
+
+OAuth 2.0 Token Exchange explicitly supports delegation/impersonation scenarios. But OBO primarily helps propagate or exchange authorization context.
+
+The conceptual model is:
+
+```text
+User
+  │
+  ▼
+Agent A
+  │
+  │ OBO
+  ▼
+Agent B
+  │
+  ▼
+API
+```
+
+The problem with autonomous agents is that the chain can become:
+
+```text
+Human
+  ↓
+Agent A
+  ↓
+Agent B
+  ↓
+Agent C
+  ↓
+MCP
+  ↓
+Tool
+  ↓
+External API
+```
+
+The question becomes:
+
+> **Does the final authorization token adequately represent the complete reasoning and delegation context?**
+
+Not necessarily.
+
+Consider:
+
+```text
+Human
+  │
+  │ "Create a campaign"
+  ▼
+Campaign Agent
+  │
+  │ delegates
+  ▼
+Identity Agent
+  │
+  │ delegates
+  ▼
+Audience Agent
+  │
+  │ calls
+  ▼
+Customer Graph
+```
+
+OBO can establish:
+
+```text
+Agent C → acting on behalf of User
+```
+
+But your governance layer wants:
+
+```text
+Agent C
+ ├── originating human
+ ├── parent agent
+ ├── delegation reason
+ ├── original purpose
+ ├── capabilities inherited
+ ├── capabilities narrowed
+ ├── data classification
+ ├── confidence
+ ├── policy decision
+ ├── expiration
+ └── complete provenance
+```
+
+That's the difference between:
+
+**delegated authorization**
+
+and
+
+**governed delegation.**
+
+---
+
+# 4. Why does AI make identity harder?
+
+This is where your thesis becomes interesting.
+
+Traditional software has relatively deterministic execution:
+
+```text
+User
+ ↓
+Application
+ ↓
+API
+ ↓
+Database
+```
+
+Agentic AI looks more like:
+
+```text
+User
+ ↓
+Agent
+ ├── Agent
+ │    ├── Tool
+ │    └── MCP
+ │
+ ├── Agent
+ │    └── API
+ │
+ └── Agent
+      └── Agent
+           └── Tool
+```
+
+And the path may be dynamically selected by the model.
+
+That introduces several new problems.
+
+### Problem 1 — Dynamic delegation
+
+The parent agent can decide at runtime:
+
+> "I need another agent."
+
+### Problem 2 — Non-deterministic execution
+
+The exact tool sequence isn't necessarily predetermined.
+
+### Problem 3 — Identity multiplication
+
+Instead of hundreds of services, you could have thousands/millions of agent instances.
+
+### Problem 4 — Delegation depth
+
+```text
+A → B → C → D → E
+```
+
+Who authorized E?
+
+### Problem 5 — Privilege inheritance
+
+An agent might unintentionally pass more authority than necessary.
+
+### Problem 6 — Purpose drift
+
+The agent may have permission to access something but use it outside the intended purpose.
+
+That last point is particularly important for your thesis:
+
+> **Authorization answers "Can you do this?" Governance must also answer "Should this agent do this now, for this purpose, with this context?"**
+
+---
+
+# 5. What is the solution?
+
+I'd position your solution as an **Agent Identity & Delegation Governance Layer**.
+
+Not:
+
+> "Another IAM."
+
+Instead:
+
+> **Runtime identity governance for autonomous agent delegation.**
+
+Architecture:
+
+```text
+                     HUMAN
+                       │
+                       ▼
+                ┌─────────────┐
+                │ Identity    │
+                │ Provider    │
+                └──────┬──────┘
+                       │
+                       ▼
+              ┌──────────────────┐
+              │ Agent Governance │
+              │ Control Plane    │
+              └────────┬─────────┘
+                       │
+             ┌─────────┴─────────┐
+             ▼                   ▼
+       Identity Graph       Policy Engine
+             │                   │
+             └─────────┬─────────┘
+                       ▼
+               Delegation Engine
+                       │
+                       ▼
+                Agent Identity
+                       │
+                       ▼
+                 MCP Gateway
+                       │
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+       Agent A       Agent B      Agent C
+          │            │            │
+      Sandbox       Sandbox      Sandbox
+```
+
+Every agent receives a constrained identity:
+
+```text
+Agent Identity =
+    Subject
+  + Parent
+  + Delegator
+  + Purpose
+  + Capabilities
+  + Resource scope
+  + Constraints
+  + Expiration
+  + Provenance
+```
+
+---
+
+# 6. Why Sandbox / OpenShell?
+
+This is where OpenShell becomes extremely useful.
+
+OpenShell currently separates the **control plane** from the **sandbox execution boundary**. Its gateway manages things such as policy, state, credentials and authorization, while the supervisor inside the sandbox enforces restrictions around processes, filesystem, network egress and credentials. ([GitHub][1])
+
+Conceptually:
+
+```text
+              YOUR GOVERNANCE LAYER
+                       │
+             "Should Agent X do this?"
+                       │
+                       ▼
+                 OpenShell
+                Control Plane
+                       │
+                policy/config
+                       │
+                       ▼
+              ┌─────────────────┐
+              │    Sandbox      │
+              │                 │
+              │  Supervisor     │
+              │       │         │
+              │       ▼         │
+              │ Restricted      │
+              │ Agent Process   │
+              └─────────────────┘
+                       │
+                       ▼
+                External APIs
+```
+
+OpenShell's architecture explicitly defines a sandbox identity boundary and a control-plane identity boundary, and its policy proxy provides a mandatory egress path for ordinary agent traffic. ([GitHub][1])
+
+This is important:
+
+### Your layer
+
+Answers:
+
+> **Who should this agent be and what authority should it have?**
+
+### OpenShell
+
+Answers:
+
+> **How do we technically constrain the environment in which that agent executes?**
+
+That's complementary.
+
+---
+
+# 7. What problem does OpenShell solve?
+
+OpenShell is designed to execute autonomous agents with explicit policy, credential, filesystem, process and network boundaries. ([NVIDIA Docs][2])
+
+For example:
+
+```text
+Agent wants:
+
+read /customer-data
+       │
+       ▼
+Policy
+       │
+       ├── ALLOW
+       └── DENY
+```
+
+or:
+
+```text
+Agent
+  │
+  ▼
+External API
+  │
+  ▼
+OpenShell Policy Proxy
+  │
+  ├── destination
+  ├── process identity
+  ├── policy
+  └── credential
+       │
+       ▼
+    Internet
+```
+
+OpenShell's supervisor launches the agent as a restricted child process and applies filesystem, process, network and credential controls. ([NVIDIA Docs][3])
+
+So OpenShell is excellent for:
+
+* runtime isolation
+* filesystem isolation
+* process isolation
+* network egress control
+* credential protection
+* policy enforcement
+* inference routing
+* sandbox lifecycle
+* security logging
+
+---
+
+# 8. What does OpenShell NOT solve?
+
+This is **very important for your demo**.
+
+Don't claim:
+
+> "OpenShell solves agent identity governance."
+
+It doesn't.
+
+Its architecture says OpenShell integrates with identity providers and workload identity systems rather than replacing those ecosystems. ([GitHub][1])
+
+It doesn't inherently answer:
+
+### Who is the original human?
+
+```text
+Human → Agent A → Agent B → Agent C
+```
+
+### Why was Agent C created?
+
+```text
+purpose = customer_acquisition
+```
+
+### Was Agent B allowed to delegate?
+
+```text
+delegate(identity.resolve)
+```
+
+### Should Agent C inherit Agent A's privileges?
+
+Not automatically.
+
+### Did the agent's behavior remain consistent with its declared purpose?
+
+That's a behavioral-governance question.
+
+### Can we prove the entire delegation chain?
+
+That's your provenance problem.
+
+### Is the action appropriate even though technically authorized?
+
+That's the **authorization vs appropriateness** distinction.
+
+So your positioning can be:
+
+> **OpenShell secures the execution environment. Our identity-governance layer secures the delegation context.**
+
+That is a much stronger architecture story.
+
+---
+
+# 9. Local OpenShell demo
+
+The current NVIDIA developer documentation describes a quickstart based around installing OpenShell and creating a sandbox. ([NVIDIA Docs][4])
+
+Conceptually, your local demo should be:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+```
+
+Then:
+
+```bash
+openshell sandbox create -- claude
+```
+
+The exact supported agent/runtime and host requirements should be checked against the current OpenShell quickstart before you present this live.
+
+Then demonstrate:
+
+```text
+Host
+ │
+ ├── OpenShell Gateway
+ │
+ └── Sandbox
+      │
+      ├── Supervisor
+      │
+      └── Agent
+```
+
+Then demonstrate a denied operation:
+
+```text
+Agent
+  │
+  ├── read permitted file       → ALLOW
+  │
+  ├── access restricted file    → DENY
+  │
+  └── call unauthorized domain → DENY
+```
+
+That's the **runtime-governance** portion of your demo.
+
+---
+
+# 10. AdTech CDP Identity Resolution use case
+
+This is where I think your demo becomes substantially more compelling.
+
+Imagine a credit-card acquisition platform.
+
+```text
+                  Campaign Manager
+                         │
+                         ▼
+                 Campaign Agent
+                         │
+                         ▼
+              Identity Resolution Agent
+                         │
+             ┌───────────┼───────────┐
+             ▼           ▼           ▼
+           CRM          CDP       Transaction
+         Identity      Graph         Data
+             │           │           │
+             └───────────┼───────────┘
+                         ▼
+                  Audience Agent
+                         │
+                         ▼
+                   Ad Platform
+```
+
+Suppose the user asks:
+
+> "Find customers who are likely candidates for this credit card and create an audience."
+
+The Identity Resolution Agent may combine:
+
+```text
+CRM ID
+Email
+Phone
+Device ID
+Transaction behavior
+Web behavior
+Campaign interactions
+```
+
+to construct:
+
+```text
+Canonical Customer = C12345
+```
+
+Now introduce agentic AI.
+
+The agent decides:
+
+```text
+"Maybe I should query transaction history."
+```
+
+Then:
+
+```text
+Identity Agent
+      │
+      ▼
+Transaction MCP
+      │
+      ▼
+Transaction Data
+```
+
+Here's the governance problem.
+
+The agent might technically have access to the MCP but shouldn't necessarily have access to **all transaction attributes** for this particular task.
+
+---
+
+# 11. Identity-governance pitfalls in CDP
+
+You can demonstrate these five.
+
+### Pitfall 1 — Over-broad identity resolution
+
+```text
+Agent:
+"Resolve customer."
+
+Actual access:
+CRM + transaction + behavioral + household + financial data
+```
+
+The task only required:
+
+```text
+CRM + behavioral
+```
+
+But the agent receives more.
+
+---
+
+### Pitfall 2 — Delegation privilege explosion
+
+```text
+Campaign Agent
+      ↓
+Identity Agent
+      ↓
+Audience Agent
+      ↓
+Activation Agent
+```
+
+If every agent inherits the original user's privileges:
+
+```text
+Privilege = UNION(all parent privileges)
+```
+
+you eventually get:
+
+```text
+Agent 4 = enormous privilege set
+```
+
+Your governance model should instead perform:
+
+```text
+Privilege(child)
+    =
+Privilege(parent)
+    ∩
+Required capability
+    ∩
+Purpose
+    ∩
+Resource scope
+    ∩
+Policy
+```
+
+That's **least agency**, not merely least privilege.
+
+---
+
+### Pitfall 3 — Identity collision
+
+Imagine:
+
+```text
+John Smith
+john.smith@gmail.com
+device-123
+CRM-789
+```
+
+The model concludes:
+
+```text
+all = same person
+```
+
+But the confidence is only:
+
+```text
+0.61
+```
+
+Your EdgeMind-style governance layer could say:
+
+```text
+confidence < 0.70
+        │
+        ▼
+Do NOT activate audience
+        │
+        ▼
+Human review
+```
+
+This gives your confidence-gated architecture a concrete enterprise use case.
+
+---
+
+### Pitfall 4 — Purpose drift
+
+The agent was authorized for:
+
+```text
+purpose =
+"credit-card acquisition"
+```
+
+but starts querying:
+
+```text
+loan history
+```
+
+because the model believes it will improve targeting.
+
+Technically:
+
+```text
+ACCESS = ALLOWED
+```
+
+Governance:
+
+```text
+PURPOSE = NOT ALLOWED
+```
+
+Therefore:
+
+```text
+DENY
+```
+
+This is one of the strongest arguments for your architecture.
+
+---
+
+### Pitfall 5 — Provenance loss
+
+Without governance:
+
+```text
+User
+ ↓
+Campaign Agent
+ ↓
+Identity Agent
+ ↓
+Audience Agent
+ ↓
+MCP
+```
+
+Six hours later someone asks:
+
+> "Why was customer X added to this audience?"
+
+You need:
+
+```text
+WHO
+WHAT
+WHY
+ON WHOSE BEHALF
+WHICH AGENT
+WHICH MODEL
+WHICH DATA
+WHICH POLICY
+WHICH DELEGATION
+WHICH CONFIDENCE
+WHEN
+```
+
+That's your **agent provenance graph**.
+
+---
+
+# 12. Governance in MCP as policy
+
+I would introduce a policy object before every MCP invocation.
+
+For example:
+
+```yaml
+agent:
+  id: identity-agent-01
+
+delegation:
+  parent: campaign-agent-01
+  root_subject: user-123
+  purpose: credit-card-acquisition
+
+capabilities:
+  - identity.resolve
+
+resources:
+  - cdp.customer.identity
+
+constraints:
+  max_records: 1000
+  pii: masked
+  transaction_data: denied
+
+confidence:
+  minimum: 0.80
+
+expires_in: 300
+```
+
+Then:
+
+```text
+Agent
+  │
+  │ MCP call
+  ▼
+┌─────────────────────────┐
+│ Identity Governance     │
+│                         │
+│ Who?                    │
+│ Parent?                 │
+│ Purpose?                │
+│ Capability?             │
+│ Resource?               │
+│ Confidence?             │
+│ Expiry?                 │
+│ Delegation valid?       │
+└───────────┬─────────────┘
+            │
+       ┌────┴────┐
+       │         │
+     ALLOW      DENY
+       │
+       ▼
+      MCP
+```
+
+The MCP server should **not simply trust the model**.
+
+The request carries a verifiable capability/delegation context.
+
+---
+
+# 13. Delegate each agent into its own OpenShell sandbox
+
+This is the architecture I'd recommend demonstrating.
+
+```text
+                         USER
+                           │
+                           ▼
+                  ┌────────────────┐
+                  │ Agent Governor  │
+                  └───────┬────────┘
+                          │
+                 Delegation decision
+                          │
+        ┌─────────────────┼──────────────────┐
+        │                 │                  │
+        ▼                 ▼                  ▼
+ ┌────────────┐    ┌────────────┐     ┌────────────┐
+ │ Identity   │    │ Audience   │     │ Activation │
+ │ Agent      │    │ Agent      │     │ Agent      │
+ └─────┬──────┘    └─────┬──────┘     └─────┬──────┘
+       │                  │                  │
+       ▼                  ▼                  ▼
+ ┌────────────┐    ┌────────────┐     ┌────────────┐
+ │ OpenShell  │    │ OpenShell  │     │ OpenShell  │
+ │ Sandbox A  │    │ Sandbox B  │     │ Sandbox C  │
+ └─────┬──────┘    └─────┬──────┘     └─────┬──────┘
+       │                  │                  │
+       ▼                  ▼                  ▼
+     MCP-A              MCP-B              MCP-C
+```
+
+Each sandbox receives:
+
+```text
+Agent Identity
+      +
+Delegation Token
+      +
+Capability
+      +
+Purpose
+      +
+Resource Scope
+      +
+Expiry
+```
+
+OpenShell then enforces the **runtime boundary**.
+
+Its architecture supports sandbox-specific workload identity, while the gateway manages authorization and sandbox state and the supervisor enforces the local boundary. ([GitHub][1])
+
+---
+
+# 14. The key architecture for your demo
+
+I would actually make **your architecture sit above OpenShell**, rather than trying to compete with it.
+
+```text
+                    ┌─────────────────────┐
+                    │       HUMAN         │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │ Enterprise IdP      │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+              ┌────────────────────────────────┐
+              │   AGENT IDENTITY GOVERNOR      │
+              │                                │
+              │ Identity Resolution             │
+              │ Delegation                     │
+              │ Policy                         │
+              │ Least Agency                   │
+              │ Confidence                     │
+              │ Provenance                     │
+              │ Behavioral Context             │
+              └───────────────┬────────────────┘
+                              │
+                     signed delegation
+                              │
+              ┌───────────────┼────────────────┐
+              │               │                │
+              ▼               ▼                ▼
+       ┌────────────┐  ┌────────────┐   ┌────────────┐
+       │ Identity   │  │ Audience   │   │ Activation │
+       │ Agent      │  │ Agent      │   │ Agent      │
+       └─────┬──────┘  └─────┬──────┘   └─────┬──────┘
+             │               │                │
+             ▼               ▼                ▼
+       ┌────────────┐  ┌────────────┐   ┌────────────┐
+       │ OpenShell  │  │ OpenShell  │   │ OpenShell  │
+       │ Sandbox    │  │ Sandbox    │   │ Sandbox    │
+       └─────┬──────┘  └─────┬──────┘   └─────┬──────┘
+             │               │                │
+             ▼               ▼                ▼
+           MCP             MCP              MCP
+             │               │                │
+             ▼               ▼                ▼
+           CDP             CRM          Ad Platforms
+```
+
+---
+
+# 15. Your strongest demo narrative
+
+I would make the live demo tell **one story**, rather than demonstrate OpenShell separately.
+
+### Act 1 — Traditional identity
+
+```text
+Human → IAM → Application → API
+```
+
+Everything is relatively deterministic.
+
+### Act 2 — Agentic identity
+
+```text
+Human
+ ↓
+Campaign Agent
+ ↓
+Identity Agent
+ ↓
+Audience Agent
+ ↓
+Activation Agent
+```
+
+Ask:
+
+> **Who is actually acting?**
+
+### Act 3 — OBO
+
+Show:
+
+```text
+User
+ ↓ OBO
+Agent A
+ ↓ OBO
+Agent B
+ ↓ OBO
+Agent C
+```
+
+Then ask:
+
+> **Where is the complete delegation context?**
+
+### Act 4 — Your Governor
+
+Show:
+
+```text
+Agent B requests:
+
+identity.resolve
+```
+
+Governor evaluates:
+
+```text
+WHO?       Agent B
+PARENT?    Agent A
+ROOT?      User 123
+PURPOSE?   Card acquisition
+DATA?      Customer identity
+CONFIDENCE 0.91
+SCOPE?     Campaign 789
+EXPIRY?    5 min
+```
+
+Result:
+
+```text
+ALLOW
+```
+
+### Act 5 — Purpose drift
+
+Agent asks:
+
+```text
+transaction.history
+```
+
+Governor:
+
+```text
+Capability = DENIED
+Purpose = mismatch
+```
+
+Result:
+
+```text
+DENY
+```
+
+### Act 6 — OpenShell
+
+Even if the agent attempts to bypass the MCP policy:
+
+```text
+Agent
+  │
+  ▼
+Unauthorized network destination
+  │
+  ▼
+OpenShell policy proxy
+  │
+  ▼
+DENIED
+```
+
+Now you demonstrate the difference:
+
+> **Identity governance decides what the agent is authorized to do. OpenShell makes the execution environment enforceable.**
+
+That is the core story I would use for your **EdgeMind + agent identity governance + OpenShell** demo.
+
+---
+
+## One important correction to your "NemoClaw → OpenShell" story
+
+I would **not describe NemoClaw as simply the previous name for OpenShell**.
+
+The current NVIDIA documentation describes **OpenShell as the general-purpose sandbox runtime and policy platform**, while **NemoClaw is an opinionated stack/reference setup built on OpenShell** for supported agent runtimes. ([NVIDIA Docs][5])
+
+So your slide should say:
+
+```text
+OpenShell
+   │
+   │ general-purpose runtime
+   ▼
+Sandbox + Gateway + Supervisor + Policy
+
+NemoClaw
+   │
+   │ opinionated integration/reference stack
+   ▼
+Agent runtime + configuration + blueprint
+   +
+OpenShell
+```
+
+That distinction will make your technical explanation much more credible.
+
+### The one-line thesis for your demo
+
+> **OBO tells us who an agent is acting on behalf of; identity governance determines what that delegated agent is allowed to become and do; OpenShell provides the runtime boundary that makes those decisions enforceable.**
+
+That gives you a clean separation between **IAM/OBO**, **your agent-governance layer**, and **OpenShell runtime security**.
+
+[1]: https://github.com/NVIDIA/OpenShell/blob/main/architecture/README.md "OpenShell/architecture/README.md at main · NVIDIA/OpenShell · GitHub"
+[2]: https://docs.nvidia.com/openshell/about/overview?utm_source=chatgpt.com "Overview of NVIDIA OpenShell | NVIDIA OpenShell"
+[3]: https://docs.nvidia.com/openshell/about/how-it-works?utm_source=chatgpt.com "How OpenShell Works | NVIDIA OpenShell"
+[4]: https://docs.nvidia.com/openshell/home?utm_source=chatgpt.com "NVIDIA OpenShell Developer Guide | NVIDIA OpenShell"
+[5]: https://docs.nvidia.com/nemoclaw/user-guide/deepagents/reference/architecture?utm_source=chatgpt.com "Architecture Details | NVIDIA NemoClaw"
+
+
+PART 5:
+-------
+HYPOTHESIS:
+----
 **Research/Project Hypothesis: Identity Governance + NVIDIA OpenShell**
 
 **Primary hypothesis**
